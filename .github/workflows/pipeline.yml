@@ -6,6 +6,17 @@
       - name: Install flake8
         run: pip install flake8
 
+      - name: Normalize api/main.py before lint
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("api/main.py")
+          text = p.read_text(encoding="utf-8", errors="replace")
+          text = text.rstrip("\n") + "\n"
+          p.write_text(text, encoding="utf-8", newline="\n")
+          print("api/main.py normalized")
+          PY
+
       - name: Debug api/main.py ending
         run: |
           python - <<'PY'
@@ -14,19 +25,9 @@
           data = p.read_bytes()
           print("endswith newline:", data.endswith(b"\n"))
           print("last bytes:", repr(data[-20:]))
-          print("line count:", len(p.read_text(errors="replace").splitlines()))
+          print("line count:", len(p.read_text(encoding="utf-8", errors="replace").splitlines()))
           PY
           cat -A api/main.py | tail -n 5
 
-      - name: Normalize api/main.py line ending
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path("api/main.py")
-          text = p.read_text()
-          text = text.rstrip("\n") + "\n"
-          p.write_text(text, newline="\n")
-          PY
-
       - name: Lint api/main.py
-        run: flake8 api/main.py --max-line-length=120
+        run: python -m flake8 api/main.py --max-line-length=120
