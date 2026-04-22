@@ -285,10 +285,17 @@ jobs:
 
       - name: Submit a job through the frontend
         run: |
+          echo "Fetching CSRF token..."
+          CSRF_TOKEN=$(curl -sf -c cookies.txt http://localhost:3000/csrf-token | python3 -c "import sys,json; print(json.load(sys.stdin)['csrfToken'])")
+          echo "Got CSRF token"
+
           echo "Submitting job..."
           RESPONSE=$(curl -sf -X POST \
+            -b cookies.txt \
             -H "Content-Type: application/json" \
+            -H "CSRF-Token: $CSRF_TOKEN" \
             http://localhost:3000/submit || echo "FAILED")
+
           echo "Response: $RESPONSE"
 
           if [ "$RESPONSE" = "FAILED" ]; then
