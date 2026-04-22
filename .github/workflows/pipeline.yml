@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["**"]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
 
   # ══════════════════════════════════════════
@@ -15,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -32,7 +35,7 @@ jobs:
         run: flake8 worker/worker.py --max-line-length=120
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
 
@@ -65,10 +68,10 @@ jobs:
     needs: lint
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -99,7 +102,7 @@ jobs:
           - 5000:5000
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -141,7 +144,7 @@ jobs:
     needs: build
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Build images locally for scanning
         run: |
@@ -198,7 +201,7 @@ jobs:
       REDIS_PASSWORD: integrationtestpassword123
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Write api/.env for integration test
         run: |
@@ -217,7 +220,7 @@ jobs:
             sleep 5
             UNHEALTHY=$(docker compose ps | grep -c "unhealthy" || true)
             STARTING=$(docker compose ps | grep -c "starting" || true)
-            echo "Check $i/18 — unhealthy: $UNHEALTHY, starting: $STARTING"
+            echo "Check $i/18, unhealthy: $UNHEALTHY, starting: $STARTING"
             if [ "$UNHEALTHY" -eq 0 ] && [ "$STARTING" -eq 0 ]; then
               echo "All services ready!"
               break
@@ -273,7 +276,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Write api/.env using GitHub secret
         run: |
@@ -302,7 +305,6 @@ jobs:
           NETWORK=$(docker network ls --filter name=internal --format "{{.Name}}" | head -1)
           echo "Using network: $NETWORK"
 
-          # Start new container alongside old one
           docker run -d \
             --name api_new \
             --network "$NETWORK" \
