@@ -33,4 +33,3 @@ def get_job(job_id: str):
     if data is None:
         return JSONResponse(status_code=404, content={"error": "not found"})
     return json.loads(data)
-
