@@ -24,15 +24,21 @@ jobs:
       - name: Install flake8
         run: pip install flake8
 
-      - name: Normalize api/main.py before lint
+      - name: Normalize Python files before lint
         run: |
           python - <<'PY'
           from pathlib import Path
-          p = Path("api/main.py")
-          text = p.read_text(encoding="utf-8", errors="replace")
-          text = text.rstrip("\n") + "\n"
-          p.write_text(text, encoding="utf-8", newline="\n")
-          print("api/main.py normalized")
+
+          files = [
+              Path("api/main.py"),
+              Path("worker/worker.py"),
+          ]
+
+          for p in files:
+              text = p.read_text(encoding="utf-8", errors="replace")
+              text = text.rstrip("\n") + "\n"
+              p.write_text(text, encoding="utf-8", newline="\n")
+              print(f"normalized {p}")
           PY
 
       - name: Debug api/main.py ending
@@ -46,6 +52,18 @@ jobs:
           print("line count:", len(p.read_text(encoding="utf-8", errors="replace").splitlines()))
           PY
           cat -A api/main.py | tail -n 5
+
+      - name: Debug worker/worker.py ending
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("worker/worker.py")
+          data = p.read_bytes()
+          print("endswith newline:", data.endswith(b"\n"))
+          print("last bytes:", repr(data[-20:]))
+          print("line count:", len(p.read_text(encoding="utf-8", errors="replace").splitlines()))
+          PY
+          cat -A worker/worker.py | tail -n 5
 
       - name: Lint api/main.py
         run: python -m flake8 api/main.py --max-line-length=120
