@@ -1,0 +1,11 @@
+.env
+api/.env
+api/venv/
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
