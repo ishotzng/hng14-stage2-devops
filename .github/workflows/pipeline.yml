@@ -180,18 +180,30 @@ jobs:
           docker build -t worker:scan ./worker
           docker build -t frontend:scan ./frontend
 
+      - name: Debug Trivy version in workflow
+        run: |
+          echo "Using Trivy install URL: v0.69.3"
+
       - name: Install Trivy
         run: |
-          wget https://github.com/aquasecurity/trivy/releases/download/v0.50.0/trivy_0.50.0_Linux-64bit.tar.gz
-          tar zxvf trivy_0.50.0_Linux-64bit.tar.gz
-          sudo install trivy /usr/local/bin/trivy
+          wget -qO- https://github.com/aquasecurity/trivy/releases/download/v0.69.3/trivy_0.69.3_Linux-64bit.tar.gz \
+            | tar -xz trivy
+          sudo mv trivy /usr/local/bin/
           trivy --version
 
       - name: Scan API image
         run: |
           trivy image \
+            --exit-code 1 \
+            --severity CRITICAL \
+            --ignore-unfixed \
+            --format table \
+            api:scan
+
+          trivy image \
             --exit-code 0 \
             --severity CRITICAL \
+            --ignore-unfixed \
             --format sarif \
             --output trivy-api.sarif \
             api:scan
@@ -199,8 +211,16 @@ jobs:
       - name: Scan worker image
         run: |
           trivy image \
+            --exit-code 1 \
+            --severity CRITICAL \
+            --ignore-unfixed \
+            --format table \
+            worker:scan
+
+          trivy image \
             --exit-code 0 \
             --severity CRITICAL \
+            --ignore-unfixed \
             --format sarif \
             --output trivy-worker.sarif \
             worker:scan
@@ -208,8 +228,16 @@ jobs:
       - name: Scan frontend image
         run: |
           trivy image \
+            --exit-code 1 \
+            --severity CRITICAL \
+            --ignore-unfixed \
+            --format table \
+            frontend:scan
+
+          trivy image \
             --exit-code 0 \
             --severity CRITICAL \
+            --ignore-unfixed \
             --format sarif \
             --output trivy-frontend.sarif \
             frontend:scan
