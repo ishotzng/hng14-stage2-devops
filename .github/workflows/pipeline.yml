@@ -145,6 +145,8 @@ jobs:
         with:
           context: ./api
           push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             localhost:5000/api:${{ github.sha }}
             localhost:5000/api:latest
@@ -154,6 +156,8 @@ jobs:
         with:
           context: ./worker
           push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             localhost:5000/worker:${{ github.sha }}
             localhost:5000/worker:latest
@@ -163,6 +167,8 @@ jobs:
         with:
           context: ./frontend
           push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             localhost:5000/frontend:${{ github.sha }}
             localhost:5000/frontend:latest
@@ -258,12 +264,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Write root .env for integration test
+        run: |
+          echo "REDIS_HOST=redis" > .env
+          echo "REDIS_PORT=6379" >> .env
+          echo "REDIS_PASSWORD=${{ env.REDIS_PASSWORD }}" >> .env
+          echo "APP_ENV=test" >> .env
+          echo "API_URL=http://api:8000" >> .env
+          echo "FRONTEND_PORT=3000" >> .env
+
       - name: Write api/.env for integration test
         run: |
           echo "REDIS_HOST=redis" > api/.env
           echo "REDIS_PORT=6379" >> api/.env
           echo "REDIS_PASSWORD=${{ env.REDIS_PASSWORD }}" >> api/.env
           echo "APP_ENV=test" >> api/.env
+          echo "API_URL=http://api:8000" >> api/.env
 
       - name: Start the full stack
         run: docker compose up --build -d
@@ -336,12 +352,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Write root .env using GitHub secret
+        run: |
+          echo "REDIS_HOST=redis" > .env
+          echo "REDIS_PORT=6379" >> .env
+          echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" >> .env
+          echo "APP_ENV=production" >> .env
+          echo "API_URL=http://api:8000" >> .env
+          echo "FRONTEND_PORT=3000" >> .env
+
       - name: Write api/.env using GitHub secret
         run: |
           echo "REDIS_HOST=redis" > api/.env
           echo "REDIS_PORT=6379" >> api/.env
           echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" >> api/.env
           echo "APP_ENV=production" >> api/.env
+          echo "API_URL=http://api:8000" >> api/.env
 
       - name: Start base stack (redis + existing services)
         run: docker compose up --build -d
