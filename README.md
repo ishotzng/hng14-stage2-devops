@@ -1,45 +1,43 @@
 # hng14-stage2-devops
 
-A containerised job processing system. Users submit jobs through a frontend,
-the API stores them in Redis, and the worker picks them up and processes them.
+A containerised job-processing system. Users submit jobs through a frontend, the API stores them in Redis, and the worker picks them up and processes them asynchronously.
 
 ## Services
 
-| Service  | Description |
-|----------|-------------|
-| frontend | Node.js/Express UI at http://localhost:3000 |
-| api      | Python/FastAPI job API at port 8000 (internal only) |
-| worker   | Python background processor |
-| redis    | Shared message queue (internal only, not exposed) |
+| Service  | Description                               | Port         |
+|----------|-------------------------------------------|--------------|
+| frontend | Node.js/Express UI                        | 3000 (host)  |
+| api      | Python/FastAPI job API                    | 8000 (internal) |
+| worker   | Python background processor               | —            |
+| redis    | Shared message queue (password-protected) | internal only |
 
 ---
 
 ## Prerequisites
 
-| Tool | Version | Install |
-|------|---------|---------|
-| Docker Desktop | 24+ | https://docs.docker.com/get-docker |
-| Git | any | https://git-scm.com |
+| Tool           | Version | Install |
+|----------------|---------|---------|
+| Docker Desktop | 24+     | https://docs.docker.com/get-docker |
+| Git            | any     | https://git-scm.com |
 
 ---
 
-## Getting Started on a Clean Machine
+## Getting Started
 
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/hng14-stage2-devops.git
+git clone https://github.com/ishotzng/hng14-stage2-devops.git
 cd hng14-stage2-devops
 ```
 
 ### 2. Create your environment file
 
 ```bash
-cp .env.example api/.env
+cp .env.example .env
 ```
 
-Open `api/.env` and set a strong password for `REDIS_PASSWORD`.
-Never commit this file — it is already in `.gitignore`.
+Open `.env` and set a strong value for `REDIS_PASSWORD`. This file is already listed in `.gitignore` — never commit it.
 
 ### 3. Start the stack
 
@@ -47,18 +45,17 @@ Never commit this file — it is already in `.gitignore`.
 docker compose up --build
 ```
 
-### 4. Verify startup
-
-You should see:
+Expected output:
+```
 ✔ Container ...-redis-1     Healthy
 ✔ Container ...-api-1       Healthy
 ✔ Container ...-worker-1    Started
 ✔ Container ...-frontend-1  Started
+```
 
-### 5. Open the app
+### 4. Open the app
 
-Go to http://localhost:3000 in your browser.
-Click **Submit New Job**. The job will appear as `queued` then change to `completed`.
+Navigate to http://localhost:3000 in your browser. Click **Submit New Job** — the job will appear as `queued` and transition to `completed`.
 
 ---
 
@@ -66,8 +63,18 @@ Click **Submit New Job**. The job will appear as `queued` then change to `comple
 
 ```bash
 cd api
-pip install -r requirements.txt pytest pytest-cov
+pip install -r requirements.txt
 pytest tests/ -v --cov=main --cov-report=term-missing
+```
+
+---
+
+## Running the Integration Script
+
+```bash
+# Stack must be running first
+docker compose up -d
+bash integration.sh
 ```
 
 ---
@@ -75,30 +82,45 @@ pytest tests/ -v --cov=main --cov-report=term-missing
 ## Stopping the Stack
 
 ```bash
-docker compose down
-```
-
-To remove volumes too:
-
-```bash
-docker compose down -v
+docker compose down        # keep volumes
+docker compose down -v     # also remove volumes
 ```
 
 ---
 
 ## CI/CD Pipeline
 
-Runs automatically on every push via GitHub Actions.
+The pipeline runs automatically on every push via GitHub Actions.
 
-| Stage | What it does |
-|-------|-------------|
-| lint | flake8, eslint, hadolint |
-| test | pytest with mocked Redis, uploads coverage artifact |
-| build | builds 3 images, tags with git SHA + latest, pushes to local registry |
-| security-scan | Trivy scans all images, fails on CRITICAL findings |
-| integration-test | brings full stack up, submits job, polls until completed |
-| deploy | rolling update on pushes to main only |
+| Stage            | What it does                                                            |
+|------------------|-------------------------------------------------------------------------|
+| lint             | Flake8 (Python), ESLint (JS), Hadolint (Dockerfiles), secrets detection |
+| test             | Pytest with mocked Redis, uploads coverage XML artifact                 |
+| build            | Builds 3 images, tags with git SHA + `latest`, pushes to GHCR          |
+| security-scan    | Trivy scans all images, fails on CRITICAL findings, exports SARIF       |
+| integration-test | Brings full stack up, submits job, polls until completed, always tears down |
+| deploy           | Rolling update — runs on `main` branch pushes only                     |
 
 ### Required GitHub Secret
 
-Add `REDIS_PASSWORD` under Settings → Secrets and variables → Actions.
+Add `REDIS_PASSWORD` under **Settings → Secrets and variables → Actions**.
+
+---
+
+## Architecture
+
+```
+Browser → frontend:3000 → api:8000 → redis (internal)
+                                          ↑
+                                     worker (polls)
+```
+
+---
+
+## Security Highlights
+
+- Redis is never exposed to the host network
+- All containers run as non-root users
+- Secrets are passed via `.env` / GitHub Secrets — never baked into images
+- Trivy blocks deployments with CRITICAL CVEs
+- Hardcoded-secret detection runs in CI

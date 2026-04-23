@@ -8,13 +8,13 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 FROM python:3.11-slim
 WORKDIR /app
 
-# Create a non-root user (running as root inside containers is unsafe)
+# Create a non-root user
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
 # Copy installed packages from the builder stage
 COPY --from=builder /install /usr/local
 
-# Copy only the application code — never copy .env or secrets
+# Copy only the application code
 COPY main.py .
 
 # Switch to the non-root user
@@ -22,7 +22,7 @@ USER appuser
 
 EXPOSE 8000
 
-# Healthcheck: hits the /docs endpoint. If it fails 3 times, container is "unhealthy"
+# Healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"
 

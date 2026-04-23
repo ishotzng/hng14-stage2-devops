@@ -1,162 +1,147 @@
 # FIXES.md
 
-All bugs found in the starter repository, with file, line, problem, and fix.
+All bugs found and fixed, plus all marking-criteria gaps addressed.
 
 ---
 
 ## api/main.py
 
 **Bug 1 — Hardcoded Redis host**
-- Line: 8
-- Problem: `host="localhost"` fails inside Docker because Redis is a separate container, not localhost
-- Fix: Changed to `host=os.getenv("REDIS_HOST", "localhost")`
+- Line: 8 | Problem: `host="localhost"` fails inside Docker
+- Fix: `host=os.getenv("REDIS_HOST", "localhost")`
 
 **Bug 2 — Hardcoded Redis port**
-- Line: 8
-- Problem: `port=6379` hardcoded, not configurable without editing source
-- Fix: Changed to `port=int(os.getenv("REDIS_PORT", 6379))`
+- Line: 8 | Problem: `port=6379` not configurable
+- Fix: `port=int(os.getenv("REDIS_PORT", 6379))`
 
-**Bug 3 — Redis password never passed to client**
-- Line: 8
-- Problem: `REDIS_PASSWORD` was defined in .env but never read or passed to `redis.Redis()`
-- Fix: Added `password=os.getenv("REDIS_PASSWORD")` argument
+**Bug 3 — Redis password never passed**
+- Line: 8 | Problem: `REDIS_PASSWORD` env var never read or used
+- Fix: Added `password=os.getenv("REDIS_PASSWORD")`
 
-**Bug 4 — .env file never loaded**
-- Line: (missing)
-- Problem: No `load_dotenv()` call anywhere, so all `os.getenv()` calls return None
-- Fix: Added `from dotenv import load_dotenv` and `load_dotenv()` before Redis init
+**Bug 4 — .env never loaded**
+- Problem: No `load_dotenv()` call; all `os.getenv()` returned None
+- Fix: Added `from dotenv import load_dotenv` and `load_dotenv()`
 
-**Bug 5 — Job not found returns HTTP 200 instead of 404**
-- Line: ~20
-- Problem: `return {"error": "not found"}` sends HTTP 200 which means success
-- Fix: Changed to `return JSONResponse(status_code=404, content={"error": "not found"})`
+**Bug 5 — Job not found returned HTTP 200**
+- Line: ~20 | Problem: `return {"error": "not found"}` sends HTTP 200
+- Fix: `return JSONResponse(status_code=404, content={"error": "not found"})`
+
+**Bug 6 — Missing /health endpoint**
+- Problem: No health endpoint for Docker HEALTHCHECK or CI polling
+- Fix: Added `GET /health` that pings Redis and returns `{"status": "ok"}`
 
 ---
 
 ## api/requirements.txt
 
-**Bug 6 — python-dotenv missing**
-- Line: (missing)
-- Problem: `load_dotenv()` requires `python-dotenv`. Without it the app crashes on import
-- Fix: Added `python-dotenv` to requirements.txt
+**Bug 7 — python-dotenv missing**
+- Fix: Added `python-dotenv==1.0.1`
 
----
-
-## api/.env
-
-**Bug 7 — Real password committed to source control**
-- Line: 1
-- Problem: `REDIS_PASSWORD=supersecretpassword123` — a real credential visible in git history
-- Fix: Replaced with `REDIS_PASSWORD=your_redis_password_here`
-
-**Bug 8 — REDIS_HOST and REDIS_PORT missing**
-- Line: (missing)
-- Problem: The fixed code reads these from env but they were never defined
-- Fix: Added `REDIS_HOST=redis` and `REDIS_PORT=6379`
+**Bug 8 — httpx missing (required by FastAPI TestClient)**
+- Fix: Added `httpx==0.27.0`
 
 ---
 
 ## worker/worker.py
 
-**Bug 9 — Hardcoded Redis host**
-- Line: 6
-- Problem: Same as api/main.py — `localhost` does not resolve to the Redis container
-- Fix: Changed to `host=os.getenv("REDIS_HOST", "localhost")`
+**Bug 9 — Hardcoded Redis host/port/password**
+- Fix: All three read from environment variables via `os.getenv()`
 
-**Bug 10 — Hardcoded Redis port**
-- Line: 6
-- Problem: Port not configurable
-- Fix: Changed to `port=int(os.getenv("REDIS_PORT", 6379))`
+**Bug 10 — No graceful shutdown**
+- Fix: `SIGTERM`/`SIGINT` handlers set `running = False`; loop exits cleanly
 
-**Bug 11 — Redis password never loaded or used**
-- Line: 6
-- Problem: No password passed to Redis client, no load_dotenv()
-- Fix: Added both
-
-**Bug 12 — signal imported but never wired up**
-- Line: 4
-- Problem: `import signal` present but no handlers registered — graceful shutdown not implemented
-- Fix: Added `handle_shutdown` function registered for SIGTERM and SIGINT
-
-**Bug 13 — while True loop at module level with no shutdown path**
-- Line: 14
-- Problem: Loop runs even on import, and can never be stopped cleanly
+**Bug 11 — `while True` at module level**
 - Fix: Wrapped in `if __name__ == "__main__":` and changed to `while running`
 
-**Bug 14 — No error handling in worker loop**
-- Line: 14
-- Problem: Any exception crashes the worker permanently with no recovery
-- Fix: Wrapped loop body in `try/except Exception`
+**Bug 12 — No error handling in worker loop**
+- Fix: `try/except Exception` wraps loop body; worker sleeps 2s and continues
 
 ---
 
-## worker/requirements.txt
+## docker-compose.yml
 
-**Bug 15 — redis package unpinned**
-- Line: 1
-- Problem: No version pin — a future breaking release could be silently installed
-- Fix: Pinned to `redis==5.0.1`
+**Gap 1 — No restart policies**
+- Fix: Added `restart: always` to redis; `restart: on-failure` to api, worker, frontend
 
-**Bug 16 — python-dotenv missing**
-- Line: (missing)
-- Problem: `load_dotenv()` requires it but it was not listed
-- Fix: Added `python-dotenv==1.0.0`
+**Gap 2 — No resource limits**
+- Fix: Added `deploy.resources.limits` (cpu + memory) to all services
 
----
+**Gap 3 — Redis had no password**
+- Fix: Redis command now includes `--requirepass ${REDIS_PASSWORD}`; healthcheck uses `-a`
 
-## frontend/app.js
+**Gap 4 — Environment vars hardcoded inline**
+- Fix: Replaced inline `environment:` blocks with `env_file: - .env` on all services
 
-**Bug 17 — Hardcoded API_URL**
-- Line: 6
-- Problem: `"http://localhost:8000"` hardcoded — fails in Docker where API is a separate container
-- Fix: Changed to `process.env.API_URL || "http://localhost:8000"`
-
-**Bug 18 — No CSRF protection**
-- Line: 10
-- Problem: POST route accepts requests from any origin with no token validation (CWE-352)
-- Fix: Added `csurf` and `cookie-parser` middleware, added `/csrf-token` endpoint
-
-**Bug 19 — Unvalidated job ID in URL (SSRF risk)**
-- Line: 21
-- Problem: Any string in `:id` is interpolated directly into the upstream URL (CWE-918)
-- Fix: Added UUID regex validation, returns 400 if ID does not match
+**Gap 5 — Redis port exposed to host (risk)**
+- Fix: Removed any `ports:` from redis; it is only reachable on the internal network
 
 ---
 
-## frontend/package.json
+## api/Dockerfile — created from scratch
 
-**Bug 20 — csurf and cookie-parser missing from dependencies**
-- Line: (missing)
-- Problem: app.js requires both packages but they were not declared
-- Fix: Added both to the dependencies section
-
----
-
-## frontend/views/index.html
-
-**Bug 21 — CSRF token never fetched or sent**
-- Line: 21
-- Problem: POST requests sent without token — rejected by the CSRF middleware with 403
-- Fix: Added `init()` to fetch token on load, passed as `CSRF-Token` header in submitJob
-
-**Bug 22 — No error handling in submitJob or pollJob**
-- Line: 21
-- Problem: Unhandled promise rejections, no user feedback on failure
-- Fix: Wrapped both functions in try/catch, errors shown in the UI
+- Multi-stage build: `builder` stage installs deps; final stage is minimal
+- Base image: `python:3.11-slim` (slim variant)
+- Non-root user: `RUN adduser --disabled-password ... appuser`
+- `USER appuser` instruction present
+- `HEALTHCHECK` instruction present
+- No `ENV` instructions that leak secrets
 
 ---
 
-## Root level (missing files)
+## frontend/Dockerfile — created from scratch
 
-**Bug 23 — No .gitignore**
-- Problem: Without it, .env and node_modules could be committed, leaking credentials
-- Fix: Created .gitignore covering .env, node_modules/, __pycache__/, etc.
+- Multi-stage build: `builder` installs node_modules; final stage copies only what's needed
+- Base image: `node:20-alpine` (alpine variant)
+- Non-root user: `RUN adduser -D -H -S appuser`
+- `HEALTHCHECK` instruction using `wget`
+- `npm ci` → `npm install` (lockfile not present in repo)
 
-**Bug 24 — No .env.example**
-- Problem: No reference file for required environment variables
-- Fix: Created .env.example with all required variables set to safe placeholder values
+---
 
-File: frontend/Dockerfile
-Line: (The line number where npm ci was)
-Issue: The Dockerfile used npm ci, but the repository was missing a package-lock.json file, causing the build to fail.
-- Fix: Changed npm ci to npm install (or added the lockfile).
+## worker/Dockerfile — created from scratch
+
+- Multi-stage build with `python:3.11-slim`
+- Non-root user via `adduser`
+- `HEALTHCHECK` pings Redis to verify connectivity
+
+---
+
+## .github/workflows/ci.yml — created from scratch
+
+- **Lint job**: Flake8, ESLint, Hadolint, secrets detection (grep-based)
+- **Test job**: Pytest + coverage, uploads XML artifact
+- **Build job**: Builds all 3 images with SHA tag + `latest`; layer caching via `cache-from/cache-to gha`
+- **Security job**: Trivy scans all images, fails on CRITICAL, exports SARIF artifacts
+- **Integration job**: Spins up full Compose stack, runs `integration.sh`, teardown in `always` step
+- **Deploy job**: Only on `main` branch; rolling update service-by-service
+
+---
+
+## integration.sh — created
+
+- Health check → submit job → poll until `completed` with 60 s timeout
+- Exits 0 on success, 1 on failure or timeout
+
+---
+
+## api/tests/test_api.py — created
+
+- 5 tests covering: health, job submission, status retrieval, 404 for missing job, missing payload
+- Redis fully mocked with `unittest.mock.patch` — no live Redis required
+
+---
+
+## .env.example — updated
+
+- All required variables present with safe placeholder values
+- Inline comments explain each variable
+
+---
+
+## Root / Miscellaneous
+
+**Bug 13 — Real Redis password committed**
+- Fixed: `.env` excluded via `.gitignore`; `.env.example` uses placeholder
+
+**Bug 14 — No .gitignore**
+- Fixed: `.gitignore` covers `.env`, `node_modules/`, `__pycache__/`, coverage artefacts

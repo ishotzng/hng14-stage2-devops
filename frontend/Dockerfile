@@ -8,6 +8,7 @@ RUN npm install --omit=dev
 FROM node:20-slim
 WORKDIR /app
 
+# Create a non-root user
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
 COPY --from=builder /build/node_modules ./node_modules
